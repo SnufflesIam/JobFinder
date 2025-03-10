@@ -17,6 +17,8 @@ except ModuleNotFoundError as e:
     from selenium import webdrive
 from selenium.webdriver.common.by import By
 
+
+
 #Saved all data into the database
 #Takes 2 values, jobType must be either an 'A' for 'Apply' or 'I' for ignore.
 #jobObject which contains all the details for each job listings
@@ -27,20 +29,18 @@ def SaveToDBS(job_Type, job_Object):
     today = date.today().strftime("%d %B %Y")
     
     if jobType == 'A':
-        for item in range(len(jobObject)):
-            listing = jobObject[item]['jobListing']
-            owner = jobObject[item]['listingOwner']
-            role = jobObject[item]['jobRole']
-            conn.execute(f'''INSERT INTO ApplyFor (JobType, URL, date, listingOwner, jobRole)
-    VALUES ("{jobType}","{listing}","{today}","{owner}","{role}");
-    ''')
+        listing = jobObject['jobListing']
+        owner = jobObject['listingOwner']
+        role = jobObject['jobRole']
+        conn.execute(f'''INSERT INTO ApplyFor (JobType, URL, date, listingOwner, jobRole)
+VALUES ("{jobType}","{listing}","{today}","{owner}","{role}");
+''')
     elif jobType == 'I':
-        for item in range(len(jobObject)):
-            listing = jobObject[item]['jobListing']
-            ignore = jobObject[item]['ignoreReason']
-            conn.execute(f''' INSERT INTO IgnoreList (jobType, date, URL, ignoreReason)
-    VALUES ("{jobType}","{today}","{listing}","{ignore}")
-    ''')
+        listing = jobObject['jobListing']
+        ignore = jobObject['ignoreReason']
+        conn.execute(f''' INSERT INTO IgnoreList (jobType, date, URL, ignoreReason)
+VALUES ("{jobType}","{today}","{listing}","{ignore}")
+''')
     else:
         print("Invalid job type.")
     conn.commit()
@@ -161,6 +161,7 @@ def FilterJobListings(jobList):
             except Exception as e:
                 print(f"**AN ERROR OCCURRED ACCESSING {listing['link']}\n***Try close all Chrome windows and try again.***\n**You may need to authenticate, they detected I'm a robot***\n")
                 driver.quit()
+
     return (applyJobs, ignoredJobs)
 
 #This function will take a generic coverletter, and insert listing-specific information into it
@@ -243,7 +244,8 @@ def GrabJobListings(website):
             jobLinks.append({
                 "website": f"{website['website']}",
                 "dynamic": False,
-                "link" : f"{website['baseURL']}{item}",
+                "broadSearch": False,
+                "link" : f"{website['baseURL']}{item}"
                 })
     #If the website's dynamic content doesn't load until it is interacted with, used Selenium
     else:
@@ -267,7 +269,9 @@ def GrabJobListings(website):
             jobLinks.append({
                 "website": f"{website['website']}",
                 "dynamic": True,
-                "link": f"{item.get_attribute('href')}"})
+                "broadSearch": False,
+                "link": f"{item.get_attribute('href')}"
+                })
 
         # close the browser
         driver.quit()
@@ -280,16 +284,75 @@ def OpenJob(site_options, listings):
     siteOptions = site_options
     listings = listings
     for listing in listings:
-        if 's' in siteOptions and listing['website'] == "Seek":
+        if 'a' in siteOptions and len(siteOptions) == 1:
+            webbrowser.open(listing['jobListing'])
+        elif 's' in siteOptions and listing['website'] == "Seek":
             webbrowser.open(listing['jobListing'])
         elif 'g' in siteOptions and listing['website'] == "GradConnection":
             webbrowser.open(listing['jobListing'])
         elif 'i' in siteOptions and listing['website'] == "Indeed":
             webbrowser.open(listing['jobListing'])
+        elif 'o' in siteOptions and listing['broadSearch'] == True:
+            webbrowser.open(listing['jobListing'])
 
 
 
+#findJobs uses search phrases and posts them to apiJobs (https://app.apijobs.dev)
+#searchTerms - string of terms to search for, e,g 'software egineer'
+def searchByTerms(searchTerms, country):
+    #Establish headers to connect to apiJobs
+    headers = {
+        'apikey': 'INSERT API KEY HERE',
+        'Content-Type': 'application/json',
+    }
+    print("**To use the broad search you must obtain an apiKey from https://apijobs.dev**\n")
 
+    #Post each phrase to apiJob
+    searchTerms = re.findall('[\w]+', searchTerms)
+    Results = []
+    for item in searchTerms:
+        data = '{"sort_by":"created_at","q":'+f'"{item}"'+',"country":'+f'"{country}"'+'}'
+        response = requests.post('https://api.apijobs.dev/v1/job/search', headers=headers, data=data)
+        Results.append(response.json())
+        
+    #Check if each listing a phrase to ignore in the description
+    #If it doesn't contain an 'ignore phrase', open the website
+    searchResults = []
+    ignoreList = [
+        "[\d +]+ years"
+        ]
+    #Iterate each item in the results returned by the api
+    #Save the title, description, url and if it's ignored, save the reason
+    try:
+        for item in Results[0]['hits']:
+            for phrase in ignoreList:
+                ig = re.findall(phrase, item['description'])
+                if len(ig) < 1:
+                    searchResults.append({
+                        "website": item['website'],
+                        "jobListing": item['url'],
+                        "listingOwner":item['hiring_organization_name'],
+                        "jobRole": item['title'],
+                        "description": item['description'],
+                        "broadSearch": True,
+                        "ignored": False,
+                        "ignoreReason": ""
+                        })
+                else:
+                    searchResults.append({
+                        "website": item['website'],
+                        "jobListing": item['url'],
+                        "listingOwner":item['hiring_organization_name'],
+                        "jobRole": item['title'],
+                        "description": item['description'],
+                        "broadSearch": True,
+                        "ignored": True,
+                        "ignoreReason": f"Found the phrase: {ig}"
+                        })
+    except Exception as e:
+        print(f"Error iterating through broad search results: {e}\nResults[1]['hits'] contained: {Results[1]['hits']}\n")
+
+    return(searchResults)
 
 
 
