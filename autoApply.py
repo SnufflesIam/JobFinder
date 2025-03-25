@@ -19,7 +19,7 @@ def AutoApply(seek, indeed, gradconnection, searchTerms, country):
     #Object with links and instructions for each website
     websites = [{
         "website": "Seek",
-        "dynamic": False,
+        "dynamic": True,
         "baseURL": "https://www.seek.com.au",
         "link": f"{seek}",
         "jobREGEX": "/job/[\d]*"
@@ -77,7 +77,7 @@ def AutoApply(seek, indeed, gradconnection, searchTerms, country):
         [SaveToDBS('A', job) for job in applyJobs]
         [SaveToDBS('I', job) for job in ignoredJobs]
     except KeyError as e:
-        print(f"KeyError: {e}")
+        print(f"KeyError: {e}\n Check that the database has the appropriate tables.")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -119,15 +119,15 @@ app.getLabelWidget("title").config(font="Times 20 bold")
 #Section for URL scraping on SEEK, indeed and GradConnection
 labelText = "Times 16"
 app.addLabelEntry("Seek")
-app.setEntry("Seek", "Insert URL here")
+app.setEntry("Seek", "https://www.seek.com.au/jobs-in-information-communication-technology/in-Canberra-ACT-2600?subclassification=6287%2C6302&worktype=243%2C244%2C245")
 app.getLabelWidget("Seek").config(font=f"{labelText}")
 
 app.addLabelEntry("Indeed")
-app.setEntry("Indeed", "Insert URL here")
+app.setEntry("Indeed", "https://au.indeed.com/jobs?q=software+engineer&l=Canberra+ACT&sc=0kf%3Ajt%28parttime%29%3B&vjk=34997a2119b7a287")
 app.getLabelWidget("Indeed").config(font=f"{labelText}")
 
 app.addLabelEntry("GradConnection")
-app.setEntry("GradConnection", "Insert URL here")
+app.setEntry("GradConnection", "https://au.gradconnection.com/jobs/information-technology/canberra/")
 app.getLabelWidget("GradConnection").config(font=f"{labelText}")
 
 
@@ -136,11 +136,11 @@ app.addLabel("Broad Search Terms")
 app.getLabelWidget("Broad Search Terms").config(font="Times 20 bold")
 
 app.addLabelEntry("Search Terms")
-app.setEntry("Search Terms","")
+app.setEntry("Search Terms","Software,Software Engineer,Python Developer,Website Developer")
 app.getLabelWidget("Search Terms").config(font=f"{labelText}")
 
 app.addLabelEntry("Country")
-app.setEntry("Country","")
+app.setEntry("Country","Australia")
 app.getLabelWidget("Country").config(font=f"{labelText}")
 
 try:
@@ -179,5 +179,3 @@ except re.error as e:
     print(f"REGEX error: {e}")
 except Exception as e:
     print(f"Unknown error: {e}")
-
-

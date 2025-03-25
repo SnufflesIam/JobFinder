@@ -1,4 +1,4 @@
-import sqlite3, re, os, requests, webbrowser
+import sqlite3, re, os, requests, webbrowser, time
 from datetime import date
 from bs4 import BeautifulSoup
 try:
@@ -7,14 +7,14 @@ except ModuleNotFoundError as e:
     import pip
     print(f"{e}. Importing docx.")
     pip.main(['install', "docx"])
-    from selenium import webdrive
+    from docx import Document
 try:
     from selenium import webdriver
 except ModuleNotFoundError as e:
     import pip
     print(f"{e}. Importing selenium.")
     pip.main(['install', "selenium"])
-    from selenium import webdrive
+    from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 
@@ -27,30 +27,36 @@ def SaveToDBS(job_Type, job_Object):
     jobObject = job_Object
     conn = sqlite3.connect('autoApply.db')
     today = date.today().strftime("%d %B %Y")
-    
-    if jobType == 'A':
-        listing = jobObject['jobListing']
-        owner = jobObject['listingOwner']
-        role = jobObject['jobRole']
-        conn.execute(f'''INSERT INTO ApplyFor (JobType, URL, date, listingOwner, jobRole)
-VALUES ("{jobType}","{listing}","{today}","{owner}","{role}");
-''')
-    elif jobType == 'I':
-        listing = jobObject['jobListing']
-        ignore = jobObject['ignoreReason']
-        conn.execute(f''' INSERT INTO IgnoreList (jobType, date, URL, ignoreReason)
-VALUES ("{jobType}","{today}","{listing}","{ignore}")
-''')
-    else:
-        print("Invalid job type.")
-    conn.commit()
-    conn.close()
+    try:
+        if jobType == 'A':
+            listing = jobObject['jobListing']
+            owner = jobObject['listingOwner']
+            role = jobObject['jobRole']
+            conn.execute(f'''INSERT INTO ApplyFor(date, JobType, listingOwner, jobRole, URL)
+    VALUES ("{today}","{jobType}","{owner}","{role}","{listing}")''')
+        elif jobType == 'I':
+            listing = jobObject['jobListing']
+            ignore = jobObject['ignoreReason']
+            conn.execute(f''' INSERT INTO IgnoreList (date, JobType, URL, ignoreReason)
+    VALUES ("{today}","{jobType}","{listing}","{ignore}")
+    ''')
+        else:
+            print("Invalid job type.")
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        print(f"Line 52: There was an error inserting data into database. Error {e}")
+        print(f"**jobType: {jobType}\njobObject {jobObject}")
+        conn.commit()
+        conn.close()
 
     
 SEEKoptions = {
-    "advertiser": ['span', "data-automation", "advertiser-name"],
-    "job": ['h1',"data-automation", "job-detail-title"],
-    "body": ["div", "data-automation","jobAdDetails"]
+    "advertiser": '//*[@data-automation="advertiser-name"]',
+    "job": '//h1[@data-automation="job-detail-title"]',
+    "body": '//*[@data-automation="jobAdDetails"]',
+    "URL": '//*[@data-automation="jobTitle"]'
 }
 
 GradConnectionOptions = {
@@ -66,8 +72,6 @@ IndeedOptions = {
     "URL": '//h2/a[@class="jcs-JobTitle css-1baag51 eu4oa1w0"]'
     }
 
-'//h2/a[@class="jcs-JobTitle css-jspxzf eu4oa1w0"]'
-
 #This function filters out jobs that contain phrases or words that would normally cause me to ignore the job.
 #The filtered jobs will still be saved, but they want be automatically applied for
 #This function takes a list of URL's to be scrapes
@@ -78,6 +82,10 @@ def FilterJobListings(jobList):
         '(final|last|second|penultimate).{0,20}year',
         'completed.{0,30}degree',
         '[Ss]enior .{0,20} [Dd]eveloper',
+        '[Ss]enior.{0,20}[Ee]gineer',
+        '[Ff]ulltime',
+        '[Tt]echnical [Ll]ead',
+        'CFO'
         ]
     ignoredJobs = []
     applyJobs = []
@@ -130,11 +138,11 @@ def FilterJobListings(jobList):
         else:
             try:
                 # set up Safari WebDriver using SafariDriverManager 
-                driver = webdriver.Safari()
-                
+                driver = webdriver.Chrome()
+
                 # open the specified URL in the browser 
                 driver.get(listing['link'])
-
+                
                 #Get the job listings present on the web page
                 body = driver.find_element(By.XPATH, SearchOptions['body']).text
                 for phrase in ignorePhrases:
@@ -159,7 +167,7 @@ def FilterJobListings(jobList):
                 # close the browser
                 driver.quit()
             except Exception as e:
-                print(f"**AN ERROR OCCURRED ACCESSING {listing['link']}\n***Try close all Chrome windows and try again.***\n**You may need to authenticate, they detected I'm a robot***\n")
+                print(f"Error: {e}\n**AN ERROR OCCURRED ACCESSING {listing['link']}\n***Try close all Chrome windows and try again.***\n**You may need to authenticate, they detected I'm a robot***\n")
                 driver.quit()
 
     return (applyJobs, ignoredJobs)
@@ -223,18 +231,16 @@ def GrabJobListings(website):
             print(f"An error has occurred trying to connect to the website. Check the URL and ensure you are connected to the internet\n {e}")
             return
         soup = BeautifulSoup(PageToScrape.text, "html.parser")
+        print(f"line 228: {soup}")
 
 
         #Find all the links in the URL
         string = ""
         REGEX = website['jobREGEX']
         for link in soup.find_all('a'):
-            if website['website'] == "Indeed":
-                print(link)
             link = link.get('href')
             if link is not None:
                 string += f"~{link}"
-
         #Filter all links to only the job IDs, remove doubles and add to a jobs list
         REGEX = website['jobREGEX']
         jobIDs = re.findall(REGEX, string)
@@ -254,27 +260,53 @@ def GrabJobListings(website):
         match website['website']:
             case "Indeed":
                 relativePath = IndeedOptions['URL']
-        # set up Safari WebDriver using SafariDriverManager 
-        driver = webdriver.Safari()
-        
-        # open the specified URL in the browser 
-        driver.get(website['link'])
+                # set up Safari WebDriver using SafariDriverManager
+                #options = get_default_chrome_options()
+                driver = webdriver.Chrome()
+                
+                # open the specified URL in the browser 
+                driver.get(website['link'])
 
-        #Get the job listings present on the web page
-        jobIDs = driver.find_elements(By.XPATH, relativePath)
+                #Get the job listings present on the web page
+                jobIDs = driver.find_elements(By.XPATH, relativePath)
 
-        #Add all the found listings to the jobLinks list
-        jobLinks = []
-        for item in jobIDs:
-            jobLinks.append({
-                "website": f"{website['website']}",
-                "dynamic": True,
-                "broadSearch": False,
-                "link": f"{item.get_attribute('href')}"
-                })
+                #Add all the found listings to the jobLinks list
+                jobLinks = []
+                for item in jobIDs:
+                    jobLinks.append({
+                        "website": f"{website['website']}",
+                        "dynamic": True,
+                        "broadSearch": False,
+                        "link": f"{item.get_attribute('href')}"
+                        })
 
-        # close the browser
-        driver.quit()
+                # close the browser
+                driver.quit()
+            case "Seek":
+                relativePath = SEEKoptions['URL']
+                # set up Safari WebDriver using SafariDriverManager
+                #options = get_default_chrome_options()
+                driver = webdriver.Chrome()
+                
+                # open the specified URL in the browser 
+                driver.get(website['link'])
+
+
+                #Get the job listings present on the web page
+                jobIDs = driver.find_elements(By.XPATH, relativePath)
+
+                #Add all the found listings to the jobLinks list
+                jobLinks = []
+                for item in jobIDs:
+                    jobLinks.append({
+                        "website": f"{website['website']}",
+                        "dynamic": True,
+                        "broadSearch": False,
+                        "link": f"{item.get_attribute('href')}"
+                        })
+                # close the browser
+                driver.quit()
+            
         
     return jobLinks
 
@@ -302,10 +334,9 @@ def OpenJob(site_options, listings):
 def searchByTerms(searchTerms, country):
     #Establish headers to connect to apiJobs
     headers = {
-        'apikey': 'INSERT API KEY HERE',
+        'apikey': 'bebce871b2d5057209648407ba4163babe35396b6b7a68790e3a4da0f7a87d29',
         'Content-Type': 'application/json',
     }
-    print("**To use the broad search you must obtain an apiKey from https://apijobs.dev**\n")
 
     #Post each phrase to apiJob
     searchTerms = re.findall('[\w]+', searchTerms)
@@ -350,7 +381,7 @@ def searchByTerms(searchTerms, country):
                         "ignoreReason": f"Found the phrase: {ig}"
                         })
     except Exception as e:
-        print(f"Error iterating through broad search results: {e}\nResults[1]['hits'] contained: {Results[1]['hits']}\n")
+        print(f"Error iterating through broad search results: {e}\nResults[1]['hits'] contained: {Results[1]['hits']}")
 
     return(searchResults)
 
