@@ -119,15 +119,15 @@ app.getLabelWidget("title").config(font="Times 20 bold")
 #Section for URL scraping on SEEK, indeed and GradConnection
 labelText = "Times 16"
 app.addLabelEntry("Seek")
-app.setEntry("Seek", "https://www.seek.com.au/jobs-in-information-communication-technology/in-Canberra-ACT-2600?subclassification=6287%2C6302&worktype=243%2C244%2C245")
+app.setEntry("Seek", "..")
 app.getLabelWidget("Seek").config(font=f"{labelText}")
 
 app.addLabelEntry("Indeed")
-app.setEntry("Indeed", "https://au.indeed.com/jobs?q=software+engineer&l=Canberra+ACT&sc=0kf%3Ajt%28parttime%29%3B&vjk=34997a2119b7a287")
+app.setEntry("Indeed", "..")
 app.getLabelWidget("Indeed").config(font=f"{labelText}")
 
 app.addLabelEntry("GradConnection")
-app.setEntry("GradConnection", "https://au.gradconnection.com/jobs/information-technology/canberra/")
+app.setEntry("GradConnection", "..")
 app.getLabelWidget("GradConnection").config(font=f"{labelText}")
 
 
@@ -136,11 +136,11 @@ app.addLabel("Broad Search Terms")
 app.getLabelWidget("Broad Search Terms").config(font="Times 20 bold")
 
 app.addLabelEntry("Search Terms")
-app.setEntry("Search Terms","Software,Software Engineer,Python Developer,Website Developer")
+app.setEntry("Search Terms","..")
 app.getLabelWidget("Search Terms").config(font=f"{labelText}")
 
 app.addLabelEntry("Country")
-app.setEntry("Country","Australia")
+app.setEntry("Country","..")
 app.getLabelWidget("Country").config(font=f"{labelText}")
 
 try:
